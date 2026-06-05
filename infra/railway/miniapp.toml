@@ -1,0 +1,13 @@
+# Railway config for the Mini App (static + nginx proxy to API)
+# In Railway: Service → Settings → Config file path → infra/railway/miniapp.toml
+
+[build]
+builder = "DOCKERFILE"
+dockerfilePath = "infra/docker/miniapp.prod.Dockerfile"
+watchPatterns = ["apps/miniapp/**", "infra/docker/nginx.miniapp.conf.template"]
+
+[deploy]
+healthcheckPath = "/"
+healthcheckTimeout = 120
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 5

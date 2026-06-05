@@ -1,0 +1,96 @@
+# Debug overlay — use with:
+#   docker compose -f docker-compose.yml -f docker-compose.debug.yml up --build
+#
+# Or:  ./scripts/dev-up.ps1   (Windows)
+#      ./scripts/dev-up.sh    (Linux/macOS)
+
+services:
+  postgres:
+    ports:
+      - "5432:5432"
+
+  redis:
+    ports:
+      - "6379:6379"
+
+  api:
+    ports:
+      - "8000:8000"
+    environment:
+      DEBUG: "true"
+      LOG_LEVEL: "DEBUG"
+    volumes:
+      - ../apps/api:/app/apps/api
+      - ../packages:/app/packages
+      - ../pyproject.toml:/app/pyproject.toml:ro
+      - ../tests:/app/tests:ro
+    command: uv run uvicorn apps.api.main:app --host 0.0.0.0 --port 8000 --reload --log-level debug
+
+  bot:
+    environment:
+      DEBUG: "true"
+      LOG_LEVEL: "DEBUG"
+    volumes:
+      - ../apps/bot:/app/apps/bot
+      - ../packages:/app/packages
+      - ../pyproject.toml:/app/pyproject.toml:ro
+    command: >
+      uv run watchfiles
+      --filter python
+      "python -m apps.bot.main"
+      apps/bot packages
+
+  miniapp:
+    ports:
+      - "5173:5173"
+    volumes:
+      - ../apps/miniapp:/app/apps/miniapp
+      - /app/apps/miniapp/node_modules
+    command: npm run dev -- --host 0.0.0.0
+
+  adminer:
+    image: adminer:4
+    ports:
+      - "8081:8080"
+    environment:
+      ADMINER_DEFAULT_SERVER: postgres
+      ADMINER_DESIGN: dracula
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - app
+
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    ports:
+      - "8084:8081"
+    environment:
+      REDIS_HOSTS: local:redis:6379
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - app
+
+  dozzle:
+    image: amir20/dozzle:latest
+    ports:
+      - "8083:8080"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    environment:
+      DOZZLE_ENABLE_ACTIONS: "true"
+    networks:
+      - app
+
+  mailpit:
+    image: axllent/mailpit:latest
+    ports:
+      - "8025:8025"
+      - "1025:1025"
+    environment:
+      MP_SMTP_AUTH_ACCEPT_ANY: 1
+      MP_SMTP_AUTH_ALLOW_INSECURE: 1
+    networks:
+      - app

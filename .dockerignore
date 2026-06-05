@@ -1,0 +1,54 @@
+# Secrets and local env
+.env
+.env.*
+!.env.example
+
+# Git
+.git
+.gitignore
+.github
+
+# Python
+.venv
+venv
+__pycache__
+*.py[cod]
+*.egg-info
+.pytest_cache
+.mypy_cache
+.ruff_cache
+htmlcov
+.coverage
+
+# Node / frontend
+node_modules
+apps/miniapp/node_modules
+apps/miniapp/dist
+dist
+build
+
+# IDE and OS
+.idea
+.vscode
+*.swp
+.DS_Store
+Thumbs.db
+
+# Logs and temp
+*.log
+.firecrawl
+tmp
+temp
+
+# TON / Acton build artifacts (sources copied only when needed)
+ton/build
+ton/node_modules
+ton/.git
+
+# Docs and dev-only (not needed in runtime images)
+docs
+*.md
+!apps/miniapp/README.md
+
+# Tests (not copied into production images)
+tests

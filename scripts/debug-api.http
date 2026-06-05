@@ -1,0 +1,44 @@
+# Debug API examples — requires DEBUG=true (docker-compose.debug.yml)
+# VS Code: install "REST Client" extension and send requests from this file.
+
+@baseUrl = http://localhost:8000
+@initData = {{createInitData.response.body.init_data}}
+
+### Health (debug)
+GET {{baseUrl}}/api/debug/health
+
+### Generate test initData (use as X-Telegram-Init-Data header)
+# @name createInitData
+POST {{baseUrl}}/api/debug/init-data
+Content-Type: application/json
+
+{
+  "user_id": 123456789,
+  "first_name": "Debug",
+  "username": "debug_user"
+}
+
+### List packages
+GET {{baseUrl}}/api/packages
+
+### Checkout with Stars (needs valid BOT_TOKEN in .env)
+POST {{baseUrl}}/api/checkout
+Content-Type: application/json
+X-Telegram-Init-Data: {{initData}}
+
+{
+  "package_id": "starter",
+  "method": "stars"
+}
+
+### List orders (debug)
+GET {{baseUrl}}/api/debug/orders
+
+### Simulate payment for an order (replace ORDER_ID)
+POST {{baseUrl}}/api/debug/orders/00000000-0000-0000-0000-000000000000/simulate-payment
+Content-Type: application/json
+
+{}
+
+### OpenAPI docs
+# Browser: http://localhost:8000/docs
