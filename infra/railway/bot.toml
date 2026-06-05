@@ -1,10 +1,12 @@
 # Railway config for the Bot worker (no public domain)
 # In Railway: Service → Settings → Config file path → infra/railway/bot.toml
+#
+# Also set a service variable (available at build time):
+#   RAILPACK_CONFIG_FILE=infra/railway/railpack-bot.json
 
 [build]
-builder = "DOCKERFILE"
-dockerfilePath = "infra/docker/python.Dockerfile"
-watchPatterns = ["apps/bot/**", "packages/**", "pyproject.toml", "uv.lock"]
+builder = "RAILPACK"
+watchPatterns = ["apps/bot/**", "packages/**", "pyproject.toml", "uv.lock", "scripts/railway/**"]
 
 [deploy]
 startCommand = "sh scripts/railway/start-bot.sh"

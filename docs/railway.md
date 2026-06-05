@@ -32,11 +32,13 @@ Duplicate the GitHub service twice so you have **api**, **bot**, and **miniapp**
 
 For each service, open **Settings**:
 
-| Service | Config file path | Public networking |
-|---------|------------------|-------------------|
-| **api** | `infra/railway/api.toml` | ✅ Generate domain |
-| **bot** | `infra/railway/bot.toml` | ❌ None (worker) |
-| **miniapp** | `infra/railway/miniapp.toml` | ✅ Generate domain |
+| Service | Config file path | Railpack config (build var) | Public networking |
+|---------|------------------|----------------------------|-------------------|
+| **api** | `infra/railway/api.toml` | (uses root `railpack.json`) | ✅ Generate domain |
+| **bot** | `infra/railway/bot.toml` | `RAILPACK_CONFIG_FILE=infra/railway/railpack-bot.json` | ❌ None (worker) |
+| **miniapp** | `infra/railway/miniapp.toml` | — (Dockerfile) | ✅ Generate domain |
+
+Railpack cannot auto-detect this monorepo’s FastAPI entry (`apps/api/main.py`). The root **`railpack.json`** sets the API start command. The bot service needs its own Railpack config via the build variable above.
 
 ## 4. Wire environment variables
 
@@ -131,6 +133,7 @@ Check logs in Railway dashboard or Dozzle locally.
 
 | Problem | Fix |
 |---------|-----|
+| **Railpack: No start command detected** | Root `railpack.json` defines `uvicorn apps.api.main:app` via `scripts/railway/start-api.sh`. Set config file path to `infra/railway/api.toml`, or redeploy after pulling latest. Bot service: add `RAILPACK_CONFIG_FILE=infra/railway/railpack-bot.json`. |
 | API crash on start | Check `DATABASE_URL` / `REDIS_URL` references |
 | Bot can't reach API | `API_BASE_URL` must be public API HTTPS URL |
 | Mini App checkout 401 | Open inside Telegram (needs `initData`), not plain browser |

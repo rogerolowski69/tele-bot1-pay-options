@@ -2,9 +2,8 @@
 # In Railway: Service → Settings → Config file path → infra/railway/api.toml
 
 [build]
-builder = "DOCKERFILE"
-dockerfilePath = "infra/docker/python.Dockerfile"
-watchPatterns = ["apps/api/**", "packages/**", "pyproject.toml", "uv.lock"]
+builder = "RAILPACK"
+watchPatterns = ["apps/api/**", "packages/**", "pyproject.toml", "uv.lock", "scripts/railway/**", "railpack.json"]
 
 [deploy]
 startCommand = "sh scripts/railway/start-api.sh"
