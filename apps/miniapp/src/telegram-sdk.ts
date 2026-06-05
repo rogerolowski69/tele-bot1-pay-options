@@ -10,6 +10,8 @@ import {
 
 let sdkReady = false;
 
+const INVOICE_TIMEOUT_MS = 600_000;
+
 /** Initialize Telegram Mini Apps SDK (@telegram-apps/sdk / reactjs-template pattern). */
 export function initTelegramSdk(): void {
   if (sdkReady) {
@@ -52,30 +54,56 @@ export function getInitDataRaw(): string {
   }
 }
 
-export async function openTelegramInvoice(
-  url: string,
-  onPaid: () => void,
-  onFailed: () => void,
-): Promise<void> {
+function invoiceErrorMessage(status: string): string {
+  if (status === "cancelled") {
+    return "Payment cancelled";
+  }
+  if (status === "failed") {
+    return "Payment failed";
+  }
+  return "Payment was not completed";
+}
+
+/** Open a Telegram Stars invoice and resolve when paid or reject on any other outcome. */
+export function openTelegramInvoice(url: string): Promise<void> {
   if (invoice.open.isAvailable()) {
-    const status = await invoice.open(url, "url");
-    if (status === "paid") {
-      onPaid();
-      return;
-    }
-    if (status === "failed" || status === "cancelled") {
-      onFailed();
-    }
-    return;
+    return invoice.open(url, "url").then((status) => {
+      if (status === "paid") {
+        return;
+      }
+      throw new Error(invoiceErrorMessage(status));
+    });
   }
 
-  window.Telegram?.WebApp?.openInvoice(url, (status) => {
-    if (status === "paid") {
-      onPaid();
+  return new Promise((resolve, reject) => {
+    const webApp = window.Telegram?.WebApp;
+    if (!webApp?.openInvoice) {
+      reject(new Error("Telegram invoice API is not available"));
+      return;
     }
-    if (status === "failed" || status === "cancelled") {
-      onFailed();
-    }
+
+    let settled = false;
+    const timeout = window.setTimeout(() => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      reject(new Error("Payment cancelled"));
+    }, INVOICE_TIMEOUT_MS);
+
+    webApp.openInvoice(url, (status) => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      window.clearTimeout(timeout);
+
+      if (status === "paid") {
+        resolve();
+        return;
+      }
+      reject(new Error(invoiceErrorMessage(status)));
+    });
   });
 }
 

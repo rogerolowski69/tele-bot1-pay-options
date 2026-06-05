@@ -5,7 +5,7 @@ import sys
 
 import httpx
 from aiogram import Bot, Dispatcher, F
-from aiogram.filters import CommandStart
+from aiogram.filters import Command, CommandStart
 from aiogram.types import (
     ErrorEvent,
     InlineKeyboardButton,
@@ -27,7 +27,7 @@ logging.basicConfig(
 logger = logging.getLogger("apps.bot")
 
 BOT_TOKEN = os.environ["BOT_TOKEN"]
-MINI_APP_URL = os.environ.get("MINI_APP_URL", "http://localhost:8082")
+MINI_APP_URL = os.environ.get("MINI_APP_URL", "http://localhost:8080")
 API_BASE_URL = os.environ.get("API_BASE_URL", "http://api:8000")
 WEBHOOK_SECRET = os.environ.get("WEBHOOK_SECRET", "")
 
@@ -63,20 +63,69 @@ async def cmd_start(message: Message):
     )
     await message.answer(
         "Welcome! Open the shop or use market commands:\n"
-        "/market — crypto, stocks, options, SEC fundamentals",
+        "/market — crypto, stocks, options, SEC fundamentals\n"
+        "/orders — open your purchase history in the mini app",
         reply_markup=keyboard,
     )
 
 
+@dp.message(Command("orders"))
+async def cmd_orders(message: Message):
+    keyboard = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text="My purchases",
+                    web_app=WebAppInfo(url=f"{MINI_APP_URL.rstrip('/')}/orders"),
+                )
+            ]
+        ]
+    )
+    await message.answer("Open the shop to view your purchase history.", reply_markup=keyboard)
+
+
 @dp.pre_checkout_query()
 async def pre_checkout_handler(pre_checkout_query: PreCheckoutQuery):
-    """Validate order exists before Telegram completes checkout."""
+    """Validate order amount and status with API before Telegram completes checkout."""
     payload = pre_checkout_query.invoice_payload
     if not payload.startswith("order:"):
         logger.warning("Rejected pre_checkout invalid payload=%s", payload)
         await pre_checkout_query.answer(ok=False, error_message="Invalid order")
         return
-    await pre_checkout_query.answer(ok=True)
+
+    body = {
+        "invoice_payload": payload,
+        "total_amount": pre_checkout_query.total_amount,
+        "currency": pre_checkout_query.currency,
+    }
+    headers = {}
+    if WEBHOOK_SECRET:
+        headers["X-Webhook-Secret"] = WEBHOOK_SECRET
+
+    try:
+        async with httpx.AsyncClient(timeout=15) as client:
+            response = await client.post(
+                f"{API_BASE_URL}/api/internal/pre-checkout",
+                json=body,
+                headers=headers,
+            )
+            data = response.json()
+    except httpx.HTTPError as exc:
+        logger.error("pre_checkout API call failed payload=%s error=%s", payload, exc)
+        await pre_checkout_query.answer(ok=False, error_message="Could not verify order")
+        return
+
+    if response.status_code == 200 and data.get("ok"):
+        await pre_checkout_query.answer(ok=True)
+        return
+
+    error_message = data.get("error")
+    if isinstance(error_message, dict):
+        error_message = error_message.get("message") or "Invalid order"
+    elif not isinstance(error_message, str) or not error_message:
+        error_message = "Invalid order"
+    logger.warning("Rejected pre_checkout payload=%s reason=%s", payload, error_message)
+    await pre_checkout_query.answer(ok=False, error_message=error_message)
 
 
 @dp.message(F.successful_payment)
@@ -112,7 +161,7 @@ async def successful_payment_handler(message: Message):
         return
 
     if data.get("status") == "paid":
-        await message.answer("Payment confirmed! Your package is ready.")
+        await message.answer("Payment confirmed! Your package details were sent above.")
     else:
         await message.answer("Payment received. We're verifying your order.")
 

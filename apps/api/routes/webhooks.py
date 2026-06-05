@@ -4,6 +4,7 @@ from pydantic import BaseModel
 from apps.api.config import settings
 from apps.api.deps import get_order_service
 from apps.api.exceptions import NotFoundError
+from apps.api.services.nowpayments_webhook import verify_nowpayments_signature
 from apps.api.services.orders import OrderService
 
 router = APIRouter(prefix="/api/webhooks", tags=["webhooks"])
@@ -50,8 +51,6 @@ async def nowpayments_webhook(
     request: Request,
     order_service: OrderService = Depends(get_order_service),
 ):
-    import hashlib
-    import hmac
     import uuid
 
     try:
@@ -59,16 +58,13 @@ async def nowpayments_webhook(
     except Exception as exc:
         raise HTTPException(status_code=400, detail="Invalid JSON body") from exc
 
+    if not isinstance(body, dict):
+        raise HTTPException(status_code=400, detail="Invalid JSON body")
+
     signature = request.headers.get("x-nowpayments-sig", "")
 
     if settings.nowpayments_ipn_secret:
-        sorted_payload = str(sorted(body.items()))
-        expected = hmac.new(
-            settings.nowpayments_ipn_secret.encode(),
-            sorted_payload.encode(),
-            hashlib.sha512,
-        ).hexdigest()
-        if not hmac.compare_digest(expected, signature):
+        if not verify_nowpayments_signature(body, signature, settings.nowpayments_ipn_secret):
             raise HTTPException(status_code=401, detail="Invalid signature")
 
     payment_status = body.get("payment_status")
@@ -80,7 +76,7 @@ async def nowpayments_webhook(
         raise HTTPException(status_code=400, detail="Missing order_id")
 
     try:
-        order_uuid = uuid.UUID(order_id_raw)
+        order_uuid = uuid.UUID(str(order_id_raw))
     except ValueError as exc:
         raise HTTPException(status_code=400, detail="Invalid order_id") from exc
 

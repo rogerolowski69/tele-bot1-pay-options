@@ -1,17 +1,13 @@
 # telegram-payments-app
 
-Monorepo for a Telegram bot + Mini App with three payment paths:
-
-1. **Telegram Stars** (`XTR`) — digital goods inside Telegram
-2. **Telegram provider / card** — physical or off-Stars goods via `provider_token`
-3. **External crypto** — NOWPayments (BTCPay/KHQR adapters can plug in similarly)
+Monorepo for a Telegram bot + Mini App with **Stars** and **TON** payments, plus optional market-data bot commands.
 
 ## Structure
 
 ```
 telegram-payments-app/
 ├── apps/
-│   ├── miniapp/          # React + Vite Telegram Mini App
+│   ├── miniapp/          # React + Vite + @telegram-apps/sdk + TonConnect
 │   ├── bot/              # aiogram 3.x bot
 │   └── api/              # FastAPI backend
 ├── packages/
@@ -20,247 +16,207 @@ telegram-payments-app/
 │   └── market_data/      # SEC EDGAR, yfinance, CoinGecko aggregator
 ├── infra/
 │   ├── docker-compose.yml
-│   ├── docker-compose.debug.yml   # Adminer, Redis Commander, Dozzle, Mailpit
+│   ├── docker-compose.debug.yml
 │   ├── nginx.conf
 │   └── db/init.sql
+├── Justfile              # just --list for all commands
 └── pyproject.toml        # Python deps (uv)
 ```
 
-## Payment flow
+## Payment flows (Stars + TON)
+
+### Stars (digital goods)
 
 ```
-User → Bot → Mini App → POST /api/checkout → Order in Postgres
-  → Telegram invoice (openInvoice) or external URL (openLink)
-  → Bot successful_payment / provider webhook → mark paid in API
-  → Deliver product (backend only)
+User → Mini App → POST /api/checkout (method: stars)
+     → openInvoice → Telegram payment
+     → Bot pre_checkout validates order with API
+     → Bot successful_payment → API mark paid → delivery DM
+     → Mini App polls until paid → success page
 ```
 
-**Frontend `openInvoice` callback is UX only.** Webhooks and bot `successful_payment` are the source of truth.
-
-## Market data aggregator
-
-Two-zone architecture keeps the bot responsive and respects upstream rate limits:
+### TON (non-digital / off-platform)
 
 ```
-Telegram user  (/crypto, /stock, /options, /fundamentals)
-        │
-        ▼
-  Bot handlers  →  API /api/market/*
-        │
-   ┌────┴────┐
-   ▼         ▼
-Market zone   Fundamental zone
-(Redis 60s)   (Redis 1h)
-├ CoinGecko   ├ SEC EDGAR (XBRL, 8 req/s)
-├ yfinance    └ yfinance financials
-├ Alpha Vantage (optional)
-└ Polygon.io (optional)
+User → Mini App → POST /api/checkout (method: ton)
+     → TonConnect send tx (comment: order:<uuid>)
+     → POST /api/checkout/ton/confirm (on-chain verify via TonAPI)
+     → mark paid → delivery DM
+     → Success page + My purchases
 ```
 
-### Bot commands
+**Frontend callbacks are UX only.** Webhooks, bot `successful_payment`, and on-chain confirmation are the source of truth.
 
-| Command | Example | Source |
-|---------|---------|--------|
-| `/crypto` | `/crypto bitcoin` | CoinGecko |
-| `/stock` | `/stock AAPL` | yfinance |
-| `/options` | `/options AAPL` | yfinance option chain |
-| `/fundamentals` | `/fundamentals AAPL` | SEC EDGAR + yfinance |
-| `/sec` | `/sec AAPL` | alias for `/fundamentals` |
-| `/market` | — | help text |
+## Quick start
 
-### SEC EDGAR setup (required for `/sec`)
+Requires: Docker, [uv](https://docs.astral.sh/uv/), Node 22+, [just](https://just.systems) (optional).
 
-The SEC blocks requests without a proper `User-Agent`. Set in `.env`:
+**Windows (PowerShell):**
 
-```
-SEC_USER_AGENT=YourName sbgreenland@gmail.com
+```powershell
+cp .env.example .env
+# Set BOT_TOKEN, WEBHOOK_SECRET, TON_RECEIVE_ADDRESS, TON_PACKAGE_PRICES
+
+just setup
+just dev
+# or: .\dev-up.ps1  |  .\task.ps1 dev-up
 ```
 
-Max **10 requests/second** — the client rate-limits to 8/sec and caches fundamentals in Redis for 1 hour.
-
-### Optional API keys
-
-```
-COINGECKO_API_KEY=        # optional pro tier
-ALPHA_VANTAGE_API_KEY=    # fallback stock quotes
-POLYGON_API_KEY=          # end-of-day reference prices
-```
-
-## Quick start (Docker + uv)
-
-Python dependencies are managed with [uv](https://docs.astral.sh/uv/) (`pyproject.toml` + `uv.lock`). Docker images install deps via `uv sync --frozen`.
+**Linux / macOS:**
 
 ```bash
 cp .env.example .env
-# Set BOT_TOKEN (and optionally TELEGRAM_PROVIDER_TOKEN, NOWPAYMENTS_*)
-
-cd infra
-docker compose -f docker-compose.yml -f docker-compose.debug.yml up --build
+just setup
+just dev
+# or: ./dev-up.sh  |  ./task.sh dev-up
 ```
 
-| Service          | URL                    |
-|------------------|------------------------|
-| App (nginx)      | http://localhost:8080 (set `NGINX_PORT` in `.env`) |
-| API              | http://localhost:8000  |
-| API docs (debug) | http://localhost:8000/docs |
-| Mini App (dev)   | http://localhost:5173  |
-| Adminer (DB)     | http://localhost:8081  |
-| Redis Commander  | http://localhost:8084  |
-| Dozzle (logs)    | http://localhost:8083  |
-| Mailpit (email)  | http://localhost:8025  |
+Both platforms use paired scripts (`.ps1` + `.sh`). Root wrappers delegate to `scripts/`; `task.ps1` / `task.sh` pick the right one via `scripts/os-run.*`.
 
-**Quick start script (Windows — run from repo root):**
+| Service          | URL |
+|------------------|-----|
+| App (nginx)      | http://localhost:8080 (`NGINX_PORT` in `.env`) |
+| API              | http://localhost:8000 |
+| Mini App (dev)   | http://localhost:5173 |
+| Adminer          | http://localhost:8081 |
 
-```powershell
-cd C:\Users\roger\Documents\code\telegram-bot\bot1-pay-options
-.\dev-up.ps1
+### Required `.env` for Stars + TON
+
+```env
+BOT_TOKEN=your_bot_token
+WEBHOOK_SECRET=random_shared_secret
+MINI_APP_URL=http://localhost:8080
+
+# TON merchant wallet (testnet while developing)
+TON_RECEIVE_ADDRESS=EQ...
+TON_NETWORK=testnet
+TON_PACKAGE_PRICES={"pro":500000000}
 ```
 
-If you get "not recognized", you are in the wrong folder. Use `.\` (backslash), not `./`.
+### Packages (seed data)
 
-**Infra + debug tools only** (run API/bot locally with uv):
+| ID | Payment | Price |
+|----|---------|-------|
+| `starter` | Stars only (digital) | 100 ⭐ |
+| `pro` | TON | 0.5 TON via `TON_PACKAGE_PRICES` |
+| `ton_pack` | TON | 0.1 TON (currency=TON in DB) |
 
-```powershell
-.\dev-infra.ps1 -d    # Windows
-```
+Each package has a `delivery_content` message sent to the user's Telegram chat after payment.
 
-### Debug tools
+## Deploy checklist (production)
 
-| Tool | Purpose |
-|------|---------|
-| **Adminer** | Browse/edit Postgres (`postgres` / `postgres` / `telegram_payments`) |
-| **Redis Commander** | Inspect cache keys, idempotency locks |
-| **Dozzle** | Live Docker container logs |
-| **Mailpit** | Catch outbound SMTP (UI on :8025, SMTP on :1025) |
-| **FastAPI `/docs`** | Swagger UI when `DEBUG=true` |
-| **`/api/debug/*`** | Test initData, list orders, simulate payment |
+1. **HTTPS URL** — Telegram Mini Apps require HTTPS (not localhost on a phone).
+2. **BotFather** — Set Mini App URL to your public nginx/miniapp domain.
+3. **TonConnect manifest** — Update `apps/miniapp/public/tonconnect-manifest.json` (`url` + `iconUrl`) or set `VITE_MINIAPP_ORIGIN` at build time.
+4. **Database** — If upgrading an existing DB, run:
+   ```sql
+   ALTER TABLE packages ADD COLUMN IF NOT EXISTS delivery_content TEXT NOT NULL DEFAULT '';
+   ```
+5. **Env on host/Railway** — `BOT_TOKEN`, `WEBHOOK_SECRET`, `TON_RECEIVE_ADDRESS`, `API_BASE_URL`, `MINI_APP_URL`.
+6. **Test** — One Stars purchase (`starter`) + one TON purchase (`pro` or `ton_pack`).
 
-Debug API routes (404 when `DEBUG=false`):
+See [docs/railway.md](docs/railway.md) for Railway (api + bot + miniapp services).
+
+## Mini App pages
+
+| Route | Purpose |
+|-------|---------|
+| `/` | Shop — Stars (digital) or TON |
+| `/orders` | Purchase history + resume pending TON |
+| `/checkout/ton?order_id=` | TON payment (works after refresh) |
+| `/success?order_id=` | Delivery content |
+
+Bot command `/orders` opens the purchase history page in the mini app.
+
+## API (Stars + TON)
 
 | Method | Path | Description |
 |--------|------|-------------|
-| GET | `/api/debug/health` | Postgres + Redis connectivity |
-| POST | `/api/debug/init-data` | Generate valid `X-Telegram-Init-Data` for curl/Postman |
-| GET | `/api/debug/orders` | List recent orders |
-| POST | `/api/debug/orders/{id}/simulate-payment` | Mark order paid without Telegram |
+| GET | `/api/packages` | List packages |
+| GET | `/api/config/payments` | `{ stars, ton }` enabled flags |
+| POST | `/api/checkout` | Create order + invoice (initData required) |
+| GET | `/api/orders/me` | User's order history |
+| GET | `/api/orders/{id}` | Order detail + delivery |
+| GET | `/api/orders/{id}/ton-payment` | Resume TON checkout payload |
+| POST | `/api/checkout/ton/confirm` | Verify on-chain TON payment |
+| POST | `/api/internal/pre-checkout` | Bot validates before Telegram checkout |
+| POST | `/api/webhooks/telegram/payment` | Bot payment confirmation |
+| GET | `/health` | Liveness |
+| GET | `/ready` | Readiness (Postgres + Redis) |
 
-See `scripts/debug-api.http` for copy-paste examples.
+## Scripts (Windows ↔ Linux)
 
-**Adminer:** System `PostgreSQL`, server `postgres`, user/pass/db from `.env` (default `postgres` / `postgres` / `telegram_payments`).
+| Task | Windows | Linux / macOS | Notes |
+|------|---------|---------------|-------|
+| Full dev stack | `.\dev-up.ps1` | `./dev-up.sh` | Docker BuildKit enabled |
+| Infra only | `.\dev-infra.ps1` | `./dev-infra.sh` | Postgres, Redis, debug UIs |
+| Tests | `.\test.ps1` | `./test.sh` | `uv run pytest` |
+| Any task (OS pick) | `.\task.ps1 <task>` | `./task.sh <task>` | Uses `scripts/os-run.*` |
+| Acton CLI | `.\acton.ps1 test` | `./acton.sh test` | WSL on Windows |
+| Acton tests | `.\task.ps1 acton-test` | `./task.sh acton-test` | |
 
-Production without debug tools:
+`scripts/os-run.ps1` / `scripts/os-run.sh` run the matching `.ps1` on Windows and `.sh` elsewhere. Railway deploy scripts under `scripts/railway/` are Linux-only (container entrypoints).
 
-```bash
-docker compose up --build
-```
-
-## Local dev (uv, without Docker)
-
-Install [uv](https://docs.astral.sh/uv/getting-started/installation/), then from the repo root:
-
-```bash
-uv sync
-cp .env.example .env
-# edit .env — set BOT_TOKEN, DATABASE_URL, REDIS_URL for localhost
-```
-
-Start Postgres + Redis + debug tools (run API/bot locally with uv):
+## Commands (just)
 
 ```powershell
-.\dev-infra.ps1 -d    # Windows
-```
-
-**API**
-
-```bash
-uv run uvicorn apps.api.main:app --reload --port 8000
-```
-
-**Bot**
-
-```bash
-uv run python -m apps.bot.main
-```
-
-**Mini App**
-
-```bash
-cd apps/miniapp
-npm install
-npm run dev
-```
-
-Add a dependency:
-
-```bash
-uv add httpx
-# commit pyproject.toml + uv.lock
+just dev          # Full Docker stack + debug tools
+just test         # pytest
+just api          # API only (local uv)
+just miniapp      # Vite dev server
+just urls         # Print local URLs
 ```
 
 ## Tests
 
 ```powershell
-.\test.ps1
-# or
-uv sync --group dev
-uv run pytest tests/ -v
+just test
+# 36+ tests — initData, checkout, Stars pre-checkout, TON verify, fulfillment, order history
 ```
-
-Coverage includes initData verification, checkout auth rules, webhook secrets, order payment logic, and health/readiness endpoints.
 
 ## Security checklist
 
-- [x] Verify `X-Telegram-Init-Data` on every checkout request
-- [x] Package prices loaded from DB (never from frontend)
+- [x] Verify `X-Telegram-Init-Data` on checkout and order routes
+- [x] Package prices from DB only
 - [x] Order created before invoice
-- [x] Payload format `order:<uuid>`
-- [x] Redis lock + idempotency on mark paid
-- [x] Amount + currency match before `paid`
-- [x] Raw webhook JSON stored in `orders.raw_provider_payload`
-- [x] NOWPayments signature verification (when secret set)
-- [x] Digital goods restricted to Stars in checkout route
+- [x] Bot pre_checkout validates amount/currency/status with API
+- [x] Redis lock + idempotent `mark_paid`
+- [x] Delivery sent once per order (Telegram DM)
+- [x] Digital goods restricted to Stars
 
-## API
+## Market data (optional)
 
-| Method | Path                         | Description              |
-|--------|------------------------------|--------------------------|
-| GET    | `/api/packages`              | List active packages     |
-| POST   | `/api/checkout`              | Create order + invoice   |
-| POST   | `/api/webhooks/telegram/payment` | Bot payment confirm  |
-| POST   | `/api/webhooks/nowpayments`  | Crypto IPN               |
-| GET    | `/health`                    | Liveness (process up)    |
-| GET    | `/ready`                     | Readiness (Postgres+Redis) |
+The bot also supports `/crypto`, `/stock`, `/options`, `/fundamentals`, `/sec`. Set `SEC_USER_AGENT=YourName email@example.com` for SEC EDGAR.
 
-### Checkout example
+## Also in repo (optional)
 
-```json
-POST /api/checkout
-Headers: X-Telegram-Init-Data: <initData>
+- NOWPayments / card checkout (API exists; shop UI focuses on Stars + TON)
+- `ton/` Acton counter dApp (separate TON demo, not the payment shop)
 
-{
-  "package_id": "starter",
-  "method": "stars"
-}
-```
+## Completeness
 
-Response:
+**Ready for local dev and production deploy (with your env):**
 
-```json
-{
-  "type": "telegram_invoice",
-  "url": "https://t.me/$...",
-  "order_id": "..."
-}
-```
+- Stars checkout, pre-checkout validation, fulfillment DMs
+- TON checkout, TonConnect, on-chain confirm, resume after refresh
+- Order history (mini app + `/orders` bot command)
+- Docker Compose dev stack, Adminer, tests (40+)
+- Paired `.ps1` / `.sh` scripts with OS-aware runners
+- Order expiry + delivery retry (API background task)
 
-## Database
+**Not included (optional / future):**
 
-Orders table matches the spec (`pending`, `invoice_created`, `paid`, `failed`, `expired`, `cancelled`, `refunded`). Seed packages in `infra/db/init.sql`.
+- Refunds (`refundStarPayment`)
+- Alembic migrations (schema via `infra/db/init.sql` + manual ALTER)
+- CI/CD pipeline
+- Card / NOWPayments in shop UI (API stubs exist; IPN signature verified)
+- `ton/` Acton counter is a separate demo, not wired to the payment shop
 
-## Next steps
+Production still requires you to configure HTTPS, BotFather mini app URL, `TON_RECEIVE_ADDRESS`, and TonConnect manifest — see deploy checklist above.
 
-- **Deploy to Railway:** [docs/railway.md](docs/railway.md)
-- Wire BTCPay / KHQR adapters in `apps/api/services/`
-- Add refund flow (Stars `refundStarPayment`)
-- Point Mini App URL in BotFather to your nginx/public URL
-- Replace CORS `*` with your domain in production
+## Future improvements
+
+- Refunds (Stars `refundStarPayment`)
+- Alembic migrations
+- Rich delivery (files, license keys, role grants)
+- GitHub Actions CI

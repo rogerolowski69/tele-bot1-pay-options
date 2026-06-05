@@ -1,3 +1,6 @@
+import json
+
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -15,7 +18,7 @@ class Settings(BaseSettings):
     btcpay_store_id: str = ""
     btcpay_api_key: str = ""
 
-    api_base_url: str = "http://localhost:8082"
+    api_base_url: str = "http://localhost:8080"
     webhook_secret: str = ""  # optional shared secret for bot→api webhook
     debug_api_key: str = ""  # optional extra auth for /api/debug when DEBUG=true
 
@@ -27,6 +30,30 @@ class Settings(BaseSettings):
     coingecko_api_key: str = ""
     alpha_vantage_api_key: str = ""
     polygon_api_key: str = ""
+
+    # TON wallet payments (TonConnect checkout)
+    ton_receive_address: str = ""
+    ton_network: str = "testnet"  # testnet | mainnet
+    tonapi_key: str = ""
+    # JSON map of package_id -> nanoton amount, e.g. {"pro": 500000000}
+    ton_package_prices: dict[str, int] = {}
+
+    # Order maintenance (expiry + delivery retries)
+    order_expiry_hours: int = 24
+    order_maintenance_interval_seconds: int = 300
+    delivery_max_attempts: int = 5
+
+    @field_validator("ton_package_prices", mode="before")
+    @classmethod
+    def parse_ton_package_prices(cls, value: object) -> dict[str, int]:
+        if value is None or value == "":
+            return {}
+        if isinstance(value, dict):
+            return {str(k): int(v) for k, v in value.items()}
+        if isinstance(value, str):
+            data = json.loads(value)
+            return {str(k): int(v) for k, v in data.items()}
+        raise TypeError("ton_package_prices must be a JSON object")
 
 
 settings = Settings()

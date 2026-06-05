@@ -1,6 +1,6 @@
 import uuid
 from datetime import UTC, datetime
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -27,13 +27,14 @@ async def test_mark_paid_idempotent_when_already_paid():
     redis.delete = AsyncMock()
 
     service = OrderService(db, redis)
-    result = await service.mark_paid(
-        order_id,
-        provider_charge_id="chg_1",
-        amount_minor=100,
-        currency="XTR",
-        raw_payload={"test": True},
-    )
+    with patch("apps.api.services.orders.deliver_order", AsyncMock()):
+        result = await service.mark_paid(
+            order_id,
+            provider_charge_id="chg_1",
+            amount_minor=100,
+            currency="XTR",
+            raw_payload={"test": True},
+        )
     assert result.status == OrderStatus.paid.value
     db.commit.assert_not_called()
 
@@ -58,13 +59,14 @@ async def test_mark_paid_fails_on_amount_mismatch():
     redis.delete = AsyncMock()
 
     service = OrderService(db, redis)
-    result = await service.mark_paid(
-        order_id,
-        provider_charge_id="chg_1",
-        amount_minor=999,
-        currency="XTR",
-        raw_payload={"wrong": True},
-    )
+    with patch("apps.api.services.orders.deliver_order", AsyncMock()):
+        result = await service.mark_paid(
+            order_id,
+            provider_charge_id="chg_1",
+            amount_minor=999,
+            currency="XTR",
+            raw_payload={"wrong": True},
+        )
     assert result.status == OrderStatus.failed.value
     db.commit.assert_called_once()
 
@@ -72,3 +74,48 @@ async def test_mark_paid_fails_on_amount_mismatch():
 def test_resolve_provider():
     assert OrderService._resolve_provider(PaymentMethod.stars).value == "telegram"
     assert OrderService._resolve_provider(PaymentMethod.crypto).value == "nowpayments"
+
+
+async def test_create_order_reuses_pending_invoice():
+    paid_order = MagicMock()
+    paid_order.status = OrderStatus.invoice_created.value
+
+    db = AsyncMock()
+    db.execute = AsyncMock(return_value=MagicMock(scalar_one_or_none=MagicMock(return_value=paid_order)))
+    service = OrderService(db, AsyncMock())
+
+    result = await service.create_order(
+        telegram_user_id=1,
+        package=MagicMock(id="starter", currency="XTR", amount_minor=100),
+        method=PaymentMethod.stars,
+        idempotency_key="1:starter:stars",
+    )
+    assert result is paid_order
+    db.add.assert_not_called()
+
+
+async def test_create_order_new_after_paid():
+    paid_order = MagicMock()
+    paid_order.status = OrderStatus.paid.value
+
+    db = AsyncMock()
+    db.execute = AsyncMock(return_value=MagicMock(scalar_one_or_none=MagicMock(return_value=paid_order)))
+    db.commit = AsyncMock()
+    db.refresh = AsyncMock(side_effect=lambda order: order)
+
+    package = MagicMock()
+    package.id = "starter"
+    package.currency = "XTR"
+    package.amount_minor = 100
+
+    service = OrderService(db, AsyncMock())
+    result = await service.create_order(
+        telegram_user_id=1,
+        package=package,
+        method=PaymentMethod.stars,
+        idempotency_key="1:starter:stars",
+    )
+
+    assert result is not paid_order
+    db.add.assert_called_once()
+    assert result.idempotency_key.startswith("1:starter:stars:")

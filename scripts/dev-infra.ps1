@@ -15,6 +15,8 @@ if (-not (Test-Path $InfraDir)) {
 
 Push-Location $InfraDir
 try {
+    $env:DOCKER_BUILDKIT = "1"
+    $env:COMPOSE_DOCKER_CLI_BUILD = "1"
     docker compose -f docker-compose.yml -f docker-compose.debug.yml up postgres redis adminer redis-commander dozzle mailpit @args
 }
 finally {

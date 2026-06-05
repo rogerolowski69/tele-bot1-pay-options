@@ -16,6 +16,7 @@ class PackageModel(Base):
     id: Mapped[str] = mapped_column(Text, primary_key=True)
     title: Mapped[str] = mapped_column(Text, nullable=False)
     description: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    delivery_content: Mapped[str] = mapped_column(Text, nullable=False, default="")
     amount_minor: Mapped[int] = mapped_column(Integer, nullable=False)
     currency: Mapped[str] = mapped_column(Text, nullable=False)
     is_digital: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)

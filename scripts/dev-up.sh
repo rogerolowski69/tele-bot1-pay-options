@@ -10,4 +10,7 @@ if [[ ! -f "$ROOT/.env" ]]; then
   echo "Created .env from .env.example — set BOT_TOKEN before testing payments."
 fi
 
+export DOCKER_BUILDKIT=1
+export COMPOSE_DOCKER_CLI_BUILD=1
+
 docker compose -f docker-compose.yml -f docker-compose.debug.yml up --build "$@"
