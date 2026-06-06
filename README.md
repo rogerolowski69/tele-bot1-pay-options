@@ -220,3 +220,19 @@ Production still requires you to configure HTTPS, BotFather mini app URL, `TON_R
 - Alembic migrations
 - Rich delivery (files, license keys, role grants)
 - GitHub Actions CI
+
+
+[6/6/2026 6:52 AM] Rog: bot1-pay-options
+[6/6/2026 6:52 AM] BotFather: Good. Now let's choose a username for your bot. It must end in `bot`. Like this, for example: TetrisBot or tetris_bot.
+[6/6/2026 6:52 AM] Rog: bot1-pay-options_bot
+[6/6/2026 6:52 AM] BotFather: Sorry, this username is invalid.
+[6/6/2026 6:52 AM] Rog: bot1-pay-options-bot
+[6/6/2026 6:53 AM] BotFather: Sorry, this username is invalid.
+[6/6/2026 6:53 AM] Rog: bot1_pay_options_bot
+[6/6/2026 6:53 AM] BotFather: Done! Congratulations on your new bot. You will find it at t.me/bot1_pay_options_bot. You can now add a description, about section and profile picture for your bot, see /help for a list of commands. By the way, when you've finished creating your cool bot, ping our Bot Support if you want a better username for it. Just make sure the bot is fully operational before you do this.
+
+Use this token to access the HTTP API:
+8705499957:AAFv9mpT0Q_AYrfjk2bL_btkpglJ_yBU2Fo
+Keep your token secure and store it safely, it can be used by anyone to control your bot.
+
+For a description of the Bot API, see this page: https://core.telegram.org/bots/api
