@@ -18,6 +18,15 @@ class PaymentConfigResponse(BaseModel):
     ton: bool = False
 
 
+class TonConfigDebugResponse(BaseModel):
+    ton_receive_address_set: bool
+    ton_receive_address_prefix: str | None
+    ton_network: str
+    ton_package_prices: dict[str, int]
+    tonapi_key_set: bool
+    ton_enabled: bool
+
+
 class OrderDetailResponse(BaseModel):
     order_id: str
     status: str
@@ -89,6 +98,20 @@ async def payment_config():
     return PaymentConfigResponse(
         stars=True,
         ton=bool(settings.ton_receive_address),
+    )
+
+
+@router.get("/debug/ton-config", response_model=TonConfigDebugResponse)
+async def debug_ton_config():
+    """Temporary production-safe TON env diagnostic (no secrets)."""
+    address = settings.ton_receive_address
+    return TonConfigDebugResponse(
+        ton_receive_address_set=bool(address),
+        ton_receive_address_prefix=address[:2] if address else None,
+        ton_network=settings.ton_network,
+        ton_package_prices=settings.ton_package_prices,
+        tonapi_key_set=bool(settings.tonapi_key),
+        ton_enabled=bool(address),
     )
 
 
