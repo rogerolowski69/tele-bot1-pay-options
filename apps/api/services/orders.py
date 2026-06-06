@@ -1,6 +1,6 @@
 import uuid
 
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 
 import logging
 
@@ -241,7 +241,7 @@ class OrderService:
 
                 order.status = OrderStatus.failed.value
 
-                order.failed_at = datetime.now(UTC)
+                order.failed_at = datetime.now(timezone.utc)
 
                 order.raw_provider_payload = {**order.raw_provider_payload, "mismatch": raw_payload}
 
@@ -255,7 +255,7 @@ class OrderService:
 
             order.provider_charge_id = provider_charge_id
 
-            order.paid_at = datetime.now(UTC)
+            order.paid_at = datetime.now(timezone.utc)
 
             order.raw_provider_payload = {**order.raw_provider_payload, "payment": raw_payload}
 

@@ -48,7 +48,14 @@ def tables_exist() -> bool:
 def main() -> None:
     ensure_database_url()
     current = alembic_current()
-    has_revision = "0001_create_packages_orders" in current or "0002_order_timestamps_tz" in current
+    has_revision = any(
+        rev in current
+        for rev in (
+            "0001_create_packages_orders",
+            "0002_order_timestamps_tz",
+            "0003_ensure_timestamptz",
+        )
+    )
 
     if tables_exist() and not has_revision:
         run(["uv", "run", "alembic", "stamp", "0001_create_packages_orders"])
