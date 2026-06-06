@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import sys
 from pathlib import Path
+from urllib.parse import urlparse
 
 import asyncpg
 
@@ -24,8 +25,25 @@ def normalize_url(url: str) -> str:
     )
 
 
+def require_reachable_database_url() -> str:
+    url = ensure_database_url()
+    host = urlparse(normalize_url(url)).hostname or ""
+    if host.endswith(".railway.internal"):
+        print(
+            "DATABASE_URL uses Railway private DNS "
+            f"({host}).\n"
+            "railway run executes on your machine — it cannot reach that host.\n\n"
+            "Verify from production instead:\n"
+            "  curl.exe -s $API/api/debug/order-timestamp-columns\n\n"
+            "Or enable Postgres TCP Proxy in Railway and use the public URL locally.",
+            file=sys.stderr,
+        )
+        raise SystemExit(1)
+    return url
+
+
 async def main() -> None:
-    conn = await asyncpg.connect(normalize_url(ensure_database_url()))
+    conn = await asyncpg.connect(normalize_url(require_reachable_database_url()))
     try:
         rows = await conn.fetch("""
             SELECT column_name, data_type

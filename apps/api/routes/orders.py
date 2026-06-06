@@ -3,8 +3,11 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, Header, HTTPException
 from pydantic import BaseModel
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from apps.api.config import settings
+from apps.api.db.session import get_db
 from apps.api.deps import get_order_service
 from apps.api.services.orders import OrderService
 from packages.shared_types.payment import OrderStatus, PaymentMethod
@@ -25,6 +28,18 @@ class TonConfigDebugResponse(BaseModel):
     ton_package_prices: dict[str, int]
     tonapi_key_set: bool
     ton_enabled: bool
+
+
+class TimestampColumnDebugResponse(BaseModel):
+    column_name: str
+    data_type: str
+    udt_name: str
+
+
+class OrderTimestampColumnsDebugResponse(BaseModel):
+    alembic_version: str | None
+    columns: list[TimestampColumnDebugResponse]
+    all_timestamptz: bool
 
 
 class OrderDetailResponse(BaseModel):
@@ -112,6 +127,40 @@ async def debug_ton_config():
         ton_package_prices=settings.ton_package_prices,
         tonapi_key_set=bool(settings.tonapi_key),
         ton_enabled=bool(address),
+    )
+
+
+@router.get("/debug/order-timestamp-columns", response_model=OrderTimestampColumnsDebugResponse)
+async def debug_order_timestamp_columns(db: AsyncSession = Depends(get_db)):
+    """Production-safe check of orders.* timestamp column types (no secrets)."""
+    col_result = await db.execute(
+        text("""
+            SELECT column_name, data_type, udt_name
+            FROM information_schema.columns
+            WHERE table_schema = 'public'
+              AND table_name = 'orders'
+              AND column_name IN ('created_at', 'paid_at', 'failed_at', 'refunded_at')
+            ORDER BY column_name
+        """)
+    )
+    columns = [
+        TimestampColumnDebugResponse(
+            column_name=row.column_name,
+            data_type=row.data_type,
+            udt_name=row.udt_name,
+        )
+        for row in col_result
+    ]
+    alembic_version: str | None = None
+    try:
+        version_result = await db.execute(text("SELECT version_num FROM alembic_version LIMIT 1"))
+        alembic_version = version_result.scalar_one_or_none()
+    except Exception:
+        pass
+    return OrderTimestampColumnsDebugResponse(
+        alembic_version=alembic_version,
+        columns=columns,
+        all_timestamptz=all(c.data_type == "timestamp with time zone" for c in columns),
     )
 
 
