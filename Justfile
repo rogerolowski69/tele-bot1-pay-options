@@ -185,17 +185,33 @@ urls:
 # ─── Database & Redis ────────────────────────────────────────────────────────
 
 [group("db")]
-[doc("Migrate + seed (Alembic + package catalog)")]
+[doc("Alembic upgrade head + seed package catalog")]
 db-setup:
     cd {{root}}; uv run python scripts/db_deploy.py
 
 [group("db")]
-[doc("Apply Alembic migrations only (requires DATABASE_URL in env)")]
+[doc("One-time: stamp head for DBs already on schema (e.g. old init.sql), then seed")]
+db-stamp-existing:
+    cd {{root}}; uv run alembic stamp head
+    cd {{root}}; uv run python scripts/seed_packages.py
+
+[group("db")]
+[doc("Show current Alembic revision")]
+db-current:
+    cd {{root}}; uv run alembic current
+
+[group("db")]
+[doc("Show Alembic migration history")]
+db-history:
+    cd {{root}}; uv run alembic history --verbose
+
+[group("db")]
+[doc("Apply Alembic migrations only")]
 db-migrate:
     cd {{root}}; uv run alembic upgrade head
 
 [group("db")]
-[doc("Seed package catalog only (requires DATABASE_URL in env)")]
+[doc("Seed package catalog only")]
 db-seed:
     cd {{root}}; uv run python scripts/seed_packages.py
 
@@ -215,53 +231,37 @@ redis-cli:
     cd {{infra}}; docker compose exec redis redis-cli
 
 [group("db")]
-[doc("WARNING: stop stack and delete postgres/redis volumes")]
+[doc("Stop stack and delete postgres/redis volumes only")]
 db-reset:
     cd {{infra}}; {{compose-debug}} down -v
 
+[group("db")]
+[doc("Wipe volumes, start debug infra, migrate + seed")]
+db-reset-dev:
+    cd {{infra}}; {{compose-debug}} down -v
+    cd {{infra}}; {{compose-debug}} up -d {{infra-services}}
+    cd {{root}}; uv run python scripts/db_deploy.py
+
 # ─── Acton / TON ───────────────────────────────────────────────────────
+# os-run.ps1 delegates to bash/.sh on Linux/macOS when pwsh is available.
 
 [group("ton")]
 [doc("Run any acton command (OS-aware: WSL on Windows, native on Linux)")]
-
-[unix]
-acton *ARGS:
-    bash "{{root}}/scripts/os-run.sh" acton {{ARGS}}
-
-[windows]
 acton *ARGS:
     pwsh -NoLogo -File "{{root}}/scripts/os-run.ps1" acton {{ARGS}}
 
 [group("ton")]
 [doc("Run Acton contract tests")]
-
-[unix]
-acton-test:
-    bash "{{root}}/scripts/os-run.sh" acton-test
-
-[windows]
 acton-test:
     pwsh -NoLogo -File "{{root}}/scripts/os-run.ps1" acton-test
 
 [group("ton")]
 [doc("Deploy contracts to local emulation")]
-
-[unix]
-acton-deploy-emulation:
-    bash "{{root}}/scripts/os-run.sh" acton-deploy-emulation
-
-[windows]
 acton-deploy-emulation:
     pwsh -NoLogo -File "{{root}}/scripts/os-run.ps1" acton-deploy-emulation
 
 [group("ton")]
 [doc("Deploy contracts to TON testnet")]
-
-[unix]
-acton-deploy-testnet:
-    bash "{{root}}/scripts/os-run.sh" acton-deploy-testnet
-
-[windows]
 acton-deploy-testnet:
     pwsh -NoLogo -File "{{root}}/scripts/os-run.ps1" acton-deploy-testnet
 

@@ -80,6 +80,16 @@ The miniapp nginx template proxies `/api/*` to `API_UPSTREAM`, so the React app 
 
 ## 5. Database migrations and seed (automatic on deploy)
 
+### One schema system (rule)
+
+| Layer | Tool | Owns |
+|-------|------|------|
+| **Schema** | Alembic | Tables, columns, indexes, constraints |
+| **Seed data** | `scripts/seed_packages.py` | `starter`, `pro`, `ton_pack` rows |
+| **Reference** | `infra/db/init.sql` | Historical snapshot — **not** mounted or auto-run |
+
+Do not mount `init.sql` in Docker or run it on Railway. Pre-deploy uses Alembic + seed only.
+
 The API service config (`infra/railway/api.toml` or root `railway.json`) runs **before each deploy**:
 
 ```toml

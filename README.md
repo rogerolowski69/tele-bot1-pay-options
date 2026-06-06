@@ -18,7 +18,7 @@ telegram-payments-app/
 │   ├── docker-compose.yml
 │   ├── docker-compose.debug.yml
 │   ├── nginx.conf
-│   └── db/init.sql
+│   └── db/               # README + init.sql (reference only)
 ├── Justfile              # just --list for all commands
 └── pyproject.toml        # Python deps (uv)
 ```
@@ -103,19 +103,15 @@ TON_PACKAGE_PRICES={"pro":500000000}
 
 Each package has a `delivery_content` message sent to the user's Telegram chat after payment.
 
-## Deploy checklist (production)
+### Database (local)
 
-1. **HTTPS URL** — Telegram Mini Apps require HTTPS (not localhost on a phone).
-2. **BotFather** — Set Mini App URL to your public nginx/miniapp domain.
-3. **TonConnect manifest** — Update `apps/miniapp/public/tonconnect-manifest.json` (`url` + `iconUrl`) or set `VITE_MINIAPP_ORIGIN` at build time.
-4. **Database** — If upgrading an existing DB, run:
-   ```sql
-   ALTER TABLE packages ADD COLUMN IF NOT EXISTS delivery_content TEXT NOT NULL DEFAULT '';
-   ```
-5. **Env on host/Railway** — `BOT_TOKEN`, `WEBHOOK_SECRET`, `TON_RECEIVE_ADDRESS`, `API_BASE_URL`, `MINI_APP_URL`.
-6. **Test** — One Stars purchase (`starter`) + one TON purchase (`pro` or `ton_pack`).
+After starting Postgres (`just infra-d` or `just dev`):
 
-See [docs/railway.md](docs/railway.md) for Railway (api + bot + miniapp services).
+```powershell
+just db-setup    # alembic upgrade head + seed_packages.py
+```
+
+See [infra/db/README.md](infra/db/README.md) for migrations, Railway stamp/seed, and the one-schema rule (Alembic = schema, seed script = package rows, `init.sql` archived only).
 
 ## Mini App pages
 
@@ -127,6 +123,17 @@ See [docs/railway.md](docs/railway.md) for Railway (api + bot + miniapp services
 | `/success?order_id=` | Delivery content |
 
 Bot command `/orders` opens the purchase history page in the mini app.
+
+## Deploy checklist (production)
+
+1. **HTTPS URL** — Telegram Mini Apps require HTTPS (not localhost on a phone).
+2. **BotFather** — Set Mini App URL to your public nginx/miniapp domain.
+3. **TonConnect manifest** — Update `apps/miniapp/public/tonconnect-manifest.json` (`url` + `iconUrl`) or set `VITE_MINIAPP_ORIGIN` at build time.
+4. **Database** — Schema via Alembic (`scripts/db_deploy.py` on Railway pre-deploy). Existing DBs that used old `init.sql`: stamp once — see [infra/db/README.md](infra/db/README.md).
+5. **Env on host/Railway** — `BOT_TOKEN`, `WEBHOOK_SECRET`, `TON_RECEIVE_ADDRESS`, `API_BASE_URL`, `MINI_APP_URL`.
+6. **Test** — One Stars purchase (`starter`) + one TON purchase (`pro` or `ton_pack`).
+
+See [docs/railway.md](docs/railway.md) for Railway (api + bot + miniapp services).
 
 ## API (Stars + TON)
 
@@ -162,6 +169,7 @@ Bot command `/orders` opens the purchase history page in the mini app.
 ```powershell
 just dev          # Full Docker stack + debug tools
 just test         # pytest
+just db-setup     # Alembic migrate + seed (after infra-d)
 just api          # API only (local uv)
 just miniapp      # Vite dev server
 just urls         # Print local URLs
@@ -219,19 +227,3 @@ Production still requires you to configure HTTPS, BotFather mini app URL, `TON_R
 - Refunds (Stars `refundStarPayment`)
 - Rich delivery (files, license keys, role grants)
 - GitHub Actions CI
-
-
-[6/6/2026 6:52 AM] Rog: bot1-pay-options
-[6/6/2026 6:52 AM] BotFather: Good. Now let's choose a username for your bot. It must end in `bot`. Like this, for example: TetrisBot or tetris_bot.
-[6/6/2026 6:52 AM] Rog: bot1-pay-options_bot
-[6/6/2026 6:52 AM] BotFather: Sorry, this username is invalid.
-[6/6/2026 6:52 AM] Rog: bot1-pay-options-bot
-[6/6/2026 6:53 AM] BotFather: Sorry, this username is invalid.
-[6/6/2026 6:53 AM] Rog: bot1_pay_options_bot
-[6/6/2026 6:53 AM] BotFather: Done! Congratulations on your new bot. You will find it at t.me/bot1_pay_options_bot. You can now add a description, about section and profile picture for your bot, see /help for a list of commands. By the way, when you've finished creating your cool bot, ping our Bot Support if you want a better username for it. Just make sure the bot is fully operational before you do this.
-
-Use this token to access the HTTP API:
-8705499957:AAFv9mpT0Q_AYrfjk2bL_btkpglJ_yBU2Fo
-Keep your token secure and store it safely, it can be used by anyone to control your bot.
-
-For a description of the Bot API, see this page: https://core.telegram.org/bots/api

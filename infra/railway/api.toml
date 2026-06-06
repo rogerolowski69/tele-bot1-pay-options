@@ -7,7 +7,7 @@ builder = "RAILPACK"
 watchPatterns = ["apps/api/**", "packages/**", "pyproject.toml", "uv.lock", "scripts/**", "migrations/**", "railpack.json", "alembic.ini", "railway.json"]
 
 [deploy]
-preDeployCommand = ["uv run alembic upgrade head && uv run python scripts/seed_packages.py"]
+preDeployCommand = ["uv run python scripts/railway_predeploy.py"]
 startCommand = "sh scripts/railway/start-api.sh"
 healthcheckPath = "/ready"
 healthcheckTimeout = 300
