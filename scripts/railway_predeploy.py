@@ -26,8 +26,9 @@ def alembic_current() -> str:
         env=os.environ.copy(),
     )
     if result.returncode != 0:
+        print(result.stdout, flush=True)
         print(result.stderr, flush=True)
-        raise subprocess.CalledProcessError(result.returncode, result.args, result.stdout, result.stderr)
+        return ""
     return result.stdout
 
 
@@ -39,8 +40,9 @@ def tables_exist() -> bool:
         env=os.environ.copy(),
     )
     if result.returncode != 0:
+        print(result.stdout, flush=True)
         print(result.stderr, flush=True)
-        raise subprocess.CalledProcessError(result.returncode, result.args, result.stdout, result.stderr)
+        return False
     names = {line.strip() for line in result.stdout.splitlines() if line.strip()}
     return "packages" in names and "orders" in names
 

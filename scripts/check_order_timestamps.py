@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import os
 import sys
 from pathlib import Path
 from urllib.parse import urlparse
@@ -28,7 +29,7 @@ def normalize_url(url: str) -> str:
 def require_reachable_database_url() -> str:
     url = ensure_database_url()
     host = urlparse(normalize_url(url)).hostname or ""
-    if host.endswith(".railway.internal"):
+    if host.endswith(".railway.internal") and not os.environ.get("RAILWAY_ENVIRONMENT"):
         print(
             "DATABASE_URL uses Railway private DNS "
             f"({host}).\n"
