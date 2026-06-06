@@ -3,10 +3,9 @@
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timedelta, timezone
 
 import redis.asyncio as redis
-from sqlalchemy import select, update
+from sqlalchemy import func, select, text, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from apps.api.config import settings
@@ -27,12 +26,12 @@ async def expire_stale_orders(db: AsyncSession) -> int:
     if settings.order_expiry_hours <= 0:
         return 0
 
-    cutoff = datetime.now(timezone.utc) - timedelta(hours=settings.order_expiry_hours)
+    hours = settings.order_expiry_hours
     result = await db.execute(
         update(OrderModel)
         .where(
             OrderModel.status.in_(_OPEN_ORDER_STATUSES),
-            OrderModel.created_at < cutoff,
+            OrderModel.created_at < func.now() - text(f"interval '{hours} hours'"),
         )
         .values(status=OrderStatus.expired.value)
     )
