@@ -2,7 +2,7 @@
   "$schema": "https://railway.com/railway.schema.json",
   "deploy": {
     "preDeployCommand": [
-      "uv run python scripts/db_deploy.py"
+      "uv run alembic upgrade head && uv run python scripts/seed_packages.py"
     ],
     "startCommand": "uv run uvicorn apps.api.main:app --host 0.0.0.0 --port ${PORT:-8080}",
     "healthcheckPath": "/ready",
