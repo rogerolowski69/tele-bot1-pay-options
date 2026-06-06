@@ -227,3 +227,5 @@ Production still requires you to configure HTTPS, BotFather mini app URL, `TON_R
 - Refunds (Stars `refundStarPayment`)
 - Rich delivery (files, license keys, role grants)
 - GitHub Actions CI
+
+from rog
