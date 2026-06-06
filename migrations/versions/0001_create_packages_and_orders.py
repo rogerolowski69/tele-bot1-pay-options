@@ -3,8 +3,9 @@
 Revision ID: 0001_create_packages_orders
 Revises:
 Create Date: 2026-06-06
-
 """
+
+from __future__ import annotations
 
 from alembic import op
 import sqlalchemy as sa
@@ -16,7 +17,7 @@ branch_labels = None
 depends_on = None
 
 
-def upgrade():
+def upgrade() -> None:
     op.create_table(
         "packages",
         sa.Column("id", sa.Text(), primary_key=True),
@@ -43,7 +44,12 @@ def upgrade():
         sa.Column("currency", sa.Text(), nullable=False),
         sa.Column("status", sa.Text(), nullable=False, server_default="pending"),
         sa.Column("idempotency_key", sa.Text(), nullable=False, unique=True),
-        sa.Column("raw_provider_payload", postgresql.JSONB(), nullable=True, server_default=sa.text("'{}'::jsonb")),
+        sa.Column(
+            "raw_provider_payload",
+            postgresql.JSONB(),
+            nullable=True,
+            server_default=sa.text("'{}'::jsonb"),
+        ),
         sa.Column("created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.text("now()")),
         sa.Column("paid_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("failed_at", sa.DateTime(timezone=True), nullable=True),
@@ -55,7 +61,7 @@ def upgrade():
     op.create_index("idx_orders_provider_invoice", "orders", ["provider", "provider_invoice_id"])
 
 
-def downgrade():
+def downgrade() -> None:
     op.drop_index("idx_orders_provider_invoice", table_name="orders")
     op.drop_index("idx_orders_status", table_name="orders")
     op.drop_index("idx_orders_telegram_user", table_name="orders")

@@ -80,31 +80,34 @@ The miniapp nginx template proxies `/api/*` to `API_UPSTREAM`, so the React app 
 
 ## 5. Database migrations and seed (automatic on deploy)
 
-The API service config (`infra/railway/api.toml`) runs **before each deploy**:
+The API service config (`infra/railway/api.toml` or root `railway.json`) runs **before each deploy**:
 
 ```toml
-preDeployCommand = ["uv run alembic upgrade head && uv run python scripts/seed_packages.py"]
+preDeployCommand = ["uv run python scripts/db_deploy.py"]
 ```
 
-This applies Alembic migrations, then upserts the package catalog via `scripts/seed_packages.py`. If pre-deploy fails, Railway blocks the deploy.
+This applies Alembic migrations, then upserts the package catalog. If pre-deploy fails, Railway blocks the deploy.
 
 **Manual (local or one-off):**
 
 ```bash
 export DATABASE_URL="postgresql://..."   # or postgresql+asyncpg://...
-just db-setup    # migrate + seed
-# or:
-just db-migrate
-just db-seed
+just db-setup
+# or: uv run python scripts/db_deploy.py
 ```
 
-**Existing DB already created from `init.sql`:** stamp Alembic once so migrations are not re-applied:
+**Existing Railway DB already created from `init.sql`:** stamp Alembic once, then seed:
 
 ```bash
-uv run alembic stamp 0001_create_packages_orders
+railway run --service tele-bot1-pay-options uv run alembic stamp head
+railway run --service tele-bot1-pay-options uv run python scripts/seed_packages.py
 ```
 
-`infra/db/init.sql` remains as reference; prefer Alembic + `scripts/seed_packages.py` for new environments.
+**Fresh DB:**
+
+```bash
+railway run --service tele-bot1-pay-options uv run python scripts/db_deploy.py
+```
 
 ## 6. Telegram / BotFather
 

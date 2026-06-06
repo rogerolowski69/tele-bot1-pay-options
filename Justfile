@@ -185,18 +185,19 @@ urls:
 # ─── Database & Redis ────────────────────────────────────────────────────────
 
 [group("db")]
-[doc("Apply Alembic migrations (requires DATABASE_URL in env)")]
+[doc("Migrate + seed (Alembic + package catalog)")]
+db-setup:
+    cd {{root}}; uv run python scripts/db_deploy.py
+
+[group("db")]
+[doc("Apply Alembic migrations only (requires DATABASE_URL in env)")]
 db-migrate:
     cd {{root}}; uv run alembic upgrade head
 
 [group("db")]
-[doc("Seed package catalog (requires DATABASE_URL in env)")]
+[doc("Seed package catalog only (requires DATABASE_URL in env)")]
 db-seed:
     cd {{root}}; uv run python scripts/seed_packages.py
-
-[group("db")]
-[doc("Migrate + seed (local or CI)")]
-db-setup: db-migrate db-seed
 
 [group("db")]
 [doc("Autogenerate new Alembic revision from models")]

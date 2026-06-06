@@ -1,40 +1,53 @@
+# migrations/env.py
+
+from __future__ import annotations
+
 import os
 from logging.config import fileConfig
 
 from alembic import context
 from sqlalchemy import engine_from_config, pool
 
-from apps.api.db.models import Base
-
 config = context.config
 
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-target_metadata = Base.metadata
+
+def migration_database_url() -> str:
+    url = os.environ.get("DATABASE_URL")
+    if not url:
+        raise RuntimeError("DATABASE_URL is required for Alembic migrations")
+
+    # Railway/Heroku-style legacy prefix
+    if url.startswith("postgres://"):
+        url = url.replace("postgres://", "postgresql://", 1)
+
+    # App runtime may use asyncpg; Alembic migration uses sync psycopg.
+    if url.startswith("postgresql+psycopg://"):
+        return url
+
+    url = url.replace("postgresql+asyncpg://", "postgresql+psycopg://")
+    if url.startswith("postgresql://"):
+        url = url.replace("postgresql://", "postgresql+psycopg://", 1)
+
+    return url
 
 
-def _sync_database_url() -> str:
-    db_url = os.environ["DATABASE_URL"]
-    if db_url.startswith("postgresql+psycopg://"):
-        return db_url
-    if db_url.startswith("postgresql+asyncpg://"):
-        return db_url.replace("postgresql+asyncpg://", "postgresql+psycopg://", 1)
-    if db_url.startswith("postgres://"):
-        return db_url.replace("postgres://", "postgresql+psycopg://", 1)
-    if db_url.startswith("postgresql://"):
-        return db_url.replace("postgresql://", "postgresql+psycopg://", 1)
-    return db_url
+# Manual migrations for now. Later, wire this to your SQLAlchemy Base.metadata.
+target_metadata = None
 
 
 def run_migrations_offline() -> None:
-    url = _sync_database_url()
+    url = migration_database_url()
     config.set_main_option("sqlalchemy.url", url)
     context.configure(
         url=url,
         target_metadata=target_metadata,
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
+        compare_type=True,
+        compare_server_default=True,
     )
 
     with context.begin_transaction():
@@ -42,8 +55,7 @@ def run_migrations_offline() -> None:
 
 
 def run_migrations_online() -> None:
-    db_url = _sync_database_url()
-    config.set_main_option("sqlalchemy.url", db_url)
+    config.set_main_option("sqlalchemy.url", migration_database_url())
 
     connectable = engine_from_config(
         config.get_section(config.config_ini_section, {}),
@@ -52,7 +64,12 @@ def run_migrations_online() -> None:
     )
 
     with connectable.connect() as connection:
-        context.configure(connection=connection, target_metadata=target_metadata)
+        context.configure(
+            connection=connection,
+            target_metadata=target_metadata,
+            compare_type=True,
+            compare_server_default=True,
+        )
 
         with context.begin_transaction():
             context.run_migrations()

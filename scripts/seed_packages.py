@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import asyncio
 import os
 
@@ -25,7 +27,7 @@ PACKAGES = [
     {
         "id": "ton_pack",
         "title": "TON Package",
-        "description": "Package priced in TON",
+        "description": "Package priced in TON (amount_minor = nanoton)",
         "delivery_content": "Your TON purchase is complete. Enjoy your package!",
         "amount_minor": 100_000_000,
         "currency": "TON",
@@ -35,21 +37,37 @@ PACKAGES = [
 
 
 def normalize_url(url: str) -> str:
-    return url.replace("postgresql+asyncpg://", "postgresql://")
+    if url.startswith("postgres://"):
+        url = url.replace("postgres://", "postgresql://", 1)
+
+    return (
+        url.replace("postgresql+asyncpg://", "postgresql://")
+        .replace("postgres+asyncpg://", "postgresql://")
+    )
 
 
 async def main() -> None:
-    conn = await asyncpg.connect(normalize_url(os.environ["DATABASE_URL"]))
+    db_url = os.environ.get("DATABASE_URL")
+    if not db_url:
+        raise RuntimeError("DATABASE_URL is required")
+
+    conn = await asyncpg.connect(normalize_url(db_url))
 
     try:
         for package in PACKAGES:
             await conn.execute(
                 """
                 INSERT INTO packages (
-                    id, title, description, delivery_content,
-                    amount_minor, currency, is_digital
+                    id,
+                    title,
+                    description,
+                    delivery_content,
+                    amount_minor,
+                    currency,
+                    is_digital,
+                    active
                 )
-                VALUES ($1, $2, $3, $4, $5, $6, $7)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, true)
                 ON CONFLICT (id) DO UPDATE SET
                     title = EXCLUDED.title,
                     description = EXCLUDED.description,
@@ -68,7 +86,7 @@ async def main() -> None:
                 package["is_digital"],
             )
 
-        print("Seeded packages.")
+        print("OK: packages seeded")
     finally:
         await conn.close()
 
