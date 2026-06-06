@@ -185,6 +185,25 @@ urls:
 # ─── Database & Redis ────────────────────────────────────────────────────────
 
 [group("db")]
+[doc("Apply Alembic migrations (requires DATABASE_URL in env)")]
+db-migrate:
+    cd {{root}}; uv run alembic upgrade head
+
+[group("db")]
+[doc("Seed package catalog (requires DATABASE_URL in env)")]
+db-seed:
+    cd {{root}}; uv run python scripts/seed_packages.py
+
+[group("db")]
+[doc("Migrate + seed (local or CI)")]
+db-setup: db-migrate db-seed
+
+[group("db")]
+[doc("Autogenerate new Alembic revision from models")]
+db-revision MESSAGE:
+    cd {{root}}; uv run alembic revision --autogenerate -m "{{MESSAGE}}"
+
+[group("db")]
 [doc("Open psql shell in postgres container")]
 db-shell:
     cd {{infra}}; docker compose exec postgres psql -U postgres -d telegram_payments

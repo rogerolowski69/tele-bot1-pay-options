@@ -62,6 +62,21 @@ app.add_middleware(
 )
 app.add_middleware(RequestLoggingMiddleware)
 
+
+@app.get("/")
+def root():
+    return {
+        "status": "ok",
+        "service": "tele-bot1-pay-options",
+        "health": "/health",
+    }
+
+
+@app.get("/healthz")
+def healthz():
+    return {"status": "ok"}
+
+
 app.include_router(health.router)
 app.include_router(checkout.router)
 app.include_router(orders.router)

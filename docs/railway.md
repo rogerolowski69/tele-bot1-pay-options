@@ -78,23 +78,33 @@ Reference Postgres and Redis from Railway plugins (**Variables** → **Add refer
 
 The miniapp nginx template proxies `/api/*` to `API_UPSTREAM`, so the React app keeps using relative `/api/...` paths.
 
-## 5. Initialize the database
+## 5. Database migrations and seed (automatic on deploy)
 
-After Postgres is running, apply the schema once.
+The API service config (`infra/railway/api.toml`) runs **before each deploy**:
 
-**Option A — local psql**
-
-```bash
-# Copy DATABASE_URL from Railway Postgres → Connect
-psql "$DATABASE_URL" -f infra/db/init.sql
+```toml
+preDeployCommand = ["uv run alembic upgrade head && uv run python scripts/seed_packages.py"]
 ```
 
-**Option B — Railway CLI**
+This applies Alembic migrations, then upserts the package catalog via `scripts/seed_packages.py`. If pre-deploy fails, Railway blocks the deploy.
+
+**Manual (local or one-off):**
 
 ```bash
-railway link
-railway run psql "$DATABASE_URL" -f infra/db/init.sql
+export DATABASE_URL="postgresql://..."   # or postgresql+asyncpg://...
+just db-setup    # migrate + seed
+# or:
+just db-migrate
+just db-seed
 ```
+
+**Existing DB already created from `init.sql`:** stamp Alembic once so migrations are not re-applied:
+
+```bash
+uv run alembic stamp 0001_create_packages_orders
+```
+
+`infra/db/init.sql` remains as reference; prefer Alembic + `scripts/seed_packages.py` for new environments.
 
 ## 6. Telegram / BotFather
 
@@ -105,9 +115,8 @@ railway run psql "$DATABASE_URL" -f infra/db/init.sql
 ## 7. Deploy order
 
 1. Postgres + Redis (plugins)
-2. **api** — wait until `/ready` returns 200
-3. Run `init.sql`
-4. **bot** + **miniapp**
+2. **api** — pre-deploy runs migrations + seed; wait until `/ready` returns 200
+3. **bot** + **miniapp**
 
 Check logs in Railway dashboard or Dozzle locally.
 

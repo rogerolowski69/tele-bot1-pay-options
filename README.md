@@ -203,11 +203,11 @@ The bot also supports `/crypto`, `/stock`, `/options`, `/fundamentals`, `/sec`. 
 - Docker Compose dev stack, Adminer, tests (40+)
 - Paired `.ps1` / `.sh` scripts with OS-aware runners
 - Order expiry + delivery retry (API background task)
+- Alembic migrations (`uv run alembic upgrade head`, `just db-migrate`)
 
 **Not included (optional / future):**
 
 - Refunds (`refundStarPayment`)
-- Alembic migrations (schema via `infra/db/init.sql` + manual ALTER)
 - CI/CD pipeline
 - Card / NOWPayments in shop UI (API stubs exist; IPN signature verified)
 - `ton/` Acton counter is a separate demo, not wired to the payment shop
@@ -217,7 +217,6 @@ Production still requires you to configure HTTPS, BotFather mini app URL, `TON_R
 ## Future improvements
 
 - Refunds (Stars `refundStarPayment`)
-- Alembic migrations
 - Rich delivery (files, license keys, role grants)
 - GitHub Actions CI
 
