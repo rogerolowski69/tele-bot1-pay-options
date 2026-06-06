@@ -7,8 +7,6 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-telegram_payments}
     volumes:
       - postgres_data:/var/lib/postgresql/data
-    # Schema: just db-setup (Alembic). Seed: scripts/seed_packages.py
-    # Do not mount init.sql — see infra/db/README.md
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-telegram_payments}"]
       interval: 5s

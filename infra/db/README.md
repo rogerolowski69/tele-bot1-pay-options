@@ -6,7 +6,7 @@ One system owns the database — no duplicate chefs.
 |-------|------|------|
 | **Schema** | Alembic (`migrations/versions/`) | Tables, columns, indexes, constraints |
 | **Seed data** | `scripts/seed_packages.py` | `starter`, `pro`, `ton_pack` package rows |
-| **Archived** | `archive/init.sql` | Reference only — **not** auto-run |
+| **Reference** | `init.sql` | Historical schema snapshot — **not** auto-run |
 
 ## Local (Docker)
 

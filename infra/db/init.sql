@@ -1,8 +1,6 @@
--- ARCHIVED — do not mount or run automatically.
+-- REFERENCE ONLY — do not mount or run automatically.
 -- Schema: Alembic migrations (migrations/versions/)
 -- Data:   scripts/seed_packages.py
---
--- This file is kept for reference only (historical bootstrap).
 
 -- Packages catalog (server-side prices — never trust frontend)
 CREATE TABLE IF NOT EXISTS packages (
