@@ -2,8 +2,15 @@ from __future__ import annotations
 
 import asyncio
 import os
+import sys
+from pathlib import Path
 
 import asyncpg
+
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
+
+from scripts._env import ensure_database_url
 
 PACKAGES = [
     {
@@ -47,9 +54,7 @@ def normalize_url(url: str) -> str:
 
 
 async def main() -> None:
-    db_url = os.environ.get("DATABASE_URL")
-    if not db_url:
-        raise RuntimeError("DATABASE_URL is required")
+    db_url = ensure_database_url()
 
     conn = await asyncpg.connect(normalize_url(db_url))
 

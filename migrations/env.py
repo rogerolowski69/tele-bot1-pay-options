@@ -2,11 +2,17 @@
 
 from __future__ import annotations
 
-import os
+import sys
 from logging.config import fileConfig
+from pathlib import Path
 
 from alembic import context
 from sqlalchemy import engine_from_config, pool
+
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
+
+from scripts._env import ensure_database_url
 
 config = context.config
 
@@ -15,9 +21,7 @@ if config.config_file_name is not None:
 
 
 def migration_database_url() -> str:
-    url = os.environ.get("DATABASE_URL")
-    if not url:
-        raise RuntimeError("DATABASE_URL is required for Alembic migrations")
+    url = ensure_database_url()
 
     # Railway/Heroku-style legacy prefix
     if url.startswith("postgres://"):
